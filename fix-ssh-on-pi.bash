@@ -1,4 +1,10 @@
-#!/bin/bash
+#!/usr/bin/env bash
+
+set -o errexit
+set -o pipefail
+set -o nounset
+# set -o xtrace
+
 # MIT License 
 # Copyright (c) 2017 Ken Fallon http://kenfallon.com
 # 
@@ -85,7 +91,7 @@ then
 fi
 
 function umount_sdcard () {
-    umount "${sdcard_mount}"
+    umount "${sdcard_mount}" || true
     if [ $( ls -al "${sdcard_mount}" | wc -l ) -eq "3" ]
     then
         echo "Sucessfully unmounted \"${sdcard_mount}\""
@@ -96,17 +102,22 @@ function umount_sdcard () {
     fi
 }
 
-# Download the latest image, using the  --continue "Continue getting a partially-downloaded file"
-wget --continue ${image_to_download} -O raspbian_image.zip
-
 echo "Checking the SHA-1 of the downloaded image matches \"${sha_sum}\""
 
 if [ $( sha256sum raspbian_image.zip | grep ${sha_sum} | wc -l ) -eq "1" ]
 then
     echo "The sha_sums match"
 else
-    echo "The sha_sums did not match"
-    exit 5
+    echo "The sha_sums did not match. attempting to download"
+# Download the latest image, using the  --continue "Continue getting a partially-downloaded file"
+    wget --continue ${image_to_download} -O raspbian_image.zip
+    if [ $( sha256sum raspbian_image.zip | grep ${sha_sum} | wc -l ) -eq "1" ]
+    then
+        echo "The sha_sums match"
+    else
+        echo "The sha_sums did not match."
+        exit 5
+    fi
 fi
 
 if [ ! -d "${sdcard_mount}" ]
@@ -210,7 +221,7 @@ cd -
 umount_sdcard
 
 new_name="${extracted_image%.*}-ssh-enabled.img"
-cp -v "${extracted_image}" "${new_name}"
+mv "${extracted_image}" "${new_name}"
 
 losetup --detach ${loop_base}
 
